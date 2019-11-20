@@ -1,0 +1,472 @@
+---
+title: "Orthopedic Materials Sales (100 points)"
+author: "Student Name: Kabita Paul"
+date: "13/10/2019"
+output: 
+  html_document:
+    code_folding: show
+    fig_height: 5
+    fig_width: 8
+    highlight: tango
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+**Purpose:** 
+
+To perform cluster analysis to identify potential business for orthopedic material sales
+
+**Description:**
+
+The objective of this study is to find ways to increase sales of orthopedic material from our company to hospitals in the United States. The data include information about over 4000 hospitals. Below is the data dictionary:
+
+**Instructions:**
+
+Please follow these steps:
+1.	In Canvas, navigate to Assignments and then Assignment4
+2.	Download and save the data set hospital_ortho.csv
+3.	Read the file: 
+
+**Install.packages**
+
+```{r}
+library(dplyr)
+library(cluster)
+library(tidyverse)
+library(tidytext)
+library(clustertend)
+library(dbscan)
+library(data.table)
+```
+
+
+
+**Load Data**
+
+```{r}
+data <- fread("Data/hospital_ortho.csv", sep=",", header=T, strip.white = T, na.strings = c("NA","NaN","","?"))
+##head(data)
+#data
+```
+
+
+
+4.	The original data includes hospitals across the US. However, we can only sell our products in NC and the nearby states of SC, VA, GA, and TN. Use the following code to narrow down the data to hospitals in these states. 
+
+```{r}
+nc_data <- data[(data$state == "NC") | (data$state == "SC") | (data$state == "VA") | (data$state == "GA") | (data$state == "TN")]
+nc_data
+```
+
+
+
+4.1.	(3 points) Look at each individual variable and decide if it should be included in cluster analysis. For those variables that you decide not to include, give your reasons for exclusion.
+
+```{r}
+colnames(nc_data)
+```
+
+Ans. Since cluster analysis relies on the distances among observations, we would consider numerical variables into consideration. We will not consider categorical values like ZIP, HID, CITY, STATE, TH, TRAUMA, REHAB
+
+**Filtering columns**
+
+```{r}
+mydata  <- select(nc_data, c(beds, rbeds, `out-v`, adm, sir, salesy, sales12, hip, knee, hip12, knee12, femur12 ))
+```
+
+4.2.	(3 points) Do you need to scale this data? Why? 
+
+```{r}
+summary(mydata)
+```
+
+Ans.
+
+As cluster analysis is dependant on the distances among points/observations, we need to standardize the data before cluster analysis. This process will assure that the differences in scales across variables will not impact the results. As an example,number of knee- surgery ranges from 0- 377 whereas number of out patient visit ranges from 0 to 984 K. Due to difference in scales, standardization is needed.
+
+
+```{r}
+#head(mydata)
+```
+
+**standardize the data**
+
+```{r}
+if (TRUE){
+  df <- scale(mydata) # Standardize the data
+} else{
+  df <- mydata[] 
+}
+head(df)
+
+```
+
+5.	Perform k-means clustering:
+
+```{r}
+#k- means clustering
+k.means.fit <- kmeans(df, 3) # Perform k-means clustering with 3 clusters
+attributes(k.means.fit) # Check the attributes that k-means generates
+
+```
+
+5.1.	(3 points) Use “Within Groups SSE” to determine the number of clusters for k-means. How many clusters you would like to create? 
+
+Ans. By looking at the Within group SSE below, we can say 3 would be reasonable choice of clusters as we increase k after 3, the SSE does not decrease much. 
+
+```{r}
+withinssplot <- function(data, nc=15, seed=1234){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of Clusters",
+       ylab="Within groups sum of squares")}
+withinssplot(df, nc=10)
+#k- means clustering
+```
+
+
+```{r}
+#hopkins(df, n = nrow(df)-1)
+```
+
+5.2.	(3 points) Paste the “Within Groups SSE” plot in the space below:
+
+```{r}
+withinssplot <- function(data, nc=15, seed=1234){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of Clusters",
+       ylab="Within groups sum of squares")}
+withinssplot(df, nc=10) 
+```
+
+5.3.	(3 points) Perform k-means clustering using the number of clusters you recommended in 5.1. How many hospitals fall in each cluster? 
+
+
+```{r}
+k.means.fit <- kmeans(df, 3) # Perform k-means clustering with 3 clusters
+k.means.fit$size # checking how many hospitals fall in each group
+attributes(k.means.fit) # Check the attributes that k-means generates
+```
+
+```{r}
+k.means.fit$centers
+```
+
+```{r}
+k.means.fit$cluster
+```
+
+
+```{r}
+#nc_data$kmeans <- k.means.fit$cluster
+```
+
+```{r}
+#nc_data
+```
+
+5.4.	(3 points) Create a two-dimensional representation of the clusters and paste it below:
+
+```{r}
+# To create the clusters in 2-dimensional space:
+clusplot(df, k.means.fit$cluster, main='2D representation of the Cluster solution', color=TRUE, shade=TRUE, labels=2, lines=0)
+```
+
+
+6.	Perform Hierarchical clustering.
+
+6.1.	(4 points) Try different hierarchical clustering and paste the dendrograms in the space below:
+
+```{r}
+df <- df[complete.cases(df),]
+d <- dist(df, method = "euclidean") # Euclidean distance matrix.
+H.single <- hclust(d, method="single")
+plot(H.single) # display dendogram
+```
+
+```{r}
+H.complete <- hclust(d, method="complete")
+plot(H.complete)
+```
+
+```{r}
+H.average <- hclust(d, method="average")
+plot(H.complete)
+```
+
+```{r}
+H.ward <- hclust(d, method="ward.D2")
+plot(H.ward)
+```
+
+6.2.	(3 points) Determine which hierarchical clustering method would be more appropriate for this data. Why? 
+
+Ans. After visually inspecting the outputs of clustering, we would go for Ward alogorithm in this case, as it makes clear seperation between clusters.
+
+```{r}
+par(mfrow=c(2,2))
+plot(H.single)
+plot(H.complete)
+plot(H.average)
+plot(H.ward)
+```
+
+6.3.	(3 points) Based on hierarchical clustering results, how many clusters do you find in this data?
+
+Ans. We can see three major clusters in the dendogram.
+
+```{r}
+par(mfrow=c(1,1))
+groups <- cutree(H.ward, k=3) # cut tree into 3 clusters
+```
+
+6.4.	(3 points) Paste the dendrogram that you chose with the red borders around the clusters in the space below:
+
+Ans.
+
+```{r}
+plot(H.ward)
+rect.hclust(H.ward, k=3, border="red") 
+
+```
+
+```{r}
+clusplot(df, groups, main='2D representation of the Cluster solution',
+         color=TRUE, shade=TRUE,
+         labels=2, lines=0)
+```
+
+```{r}
+#nc_data$hclust <- groups
+```
+
+7.	Perform DBSCAN cluster analysis: 
+7.1.	(7 points) First, you need to determine minPts. The rule of thumb for minPts is the number of dimensions of the data + 1. Suggest a method to determine the number of dimensions of this data? Implement your method and suggest a good minPts.
+
+Ans. I would recommend minPts =6 based on PCA
+
+```{r}
+data <- nc_data[complete.cases(nc_data),]
+mydata  <- select(data, c(beds, rbeds, `out-v`, adm, sir, salesy, sales12, hip, knee, hip12, knee12, femur12 ))
+pca <- prcomp(mydata, center = TRUE, scale. = TRUE)
+
+plot(pca, type = "l")
+```
+
+```{r}
+library(dbscan)
+kNNdistplot(df, k =6)
+abline(h=3, col="red")
+```
+7.2.	(3 points) Based on your suggested minPts, determine the eps. Explain your recommendation for eps. 
+
+Ans. eps= 3
+
+
+After determining minPts and eps, we can run the dbscan algorithm and plot the results:
+
+```{r}
+db <- dbscan(df, eps=3, minPts=6)
+db
+```
+
+
+
+
+
+```{r}
+db$cluster
+```
+
+7.3.	(3 points) Perform DBSCAN clustering using the minPts and eps that you recommended. How many clusters DBSCAN returns? 
+
+Ans. DBScan returns 2 clusters.
+
+
+7.4.	(3 points) How many noise points it returns? 
+
+Ans. 31 noise points.
+
+7.5.	(3 points) Create a two-dimensional representation of DBSCAN cluster(s) and paste it in the space below:
+
+```{r}
+clusplot(df, db$cluster, main='2D representation of the Cluster solution',
+         color=TRUE, shade=TRUE,labels=2, lines=0)
+```
+
+```{r}
+#hullplot(df, db)
+```
+
+
+```{r}
+#nc_data$db <- db$cluster
+```
+
+8.	Perform principal component analysis on the original data (nc_data). Then select the number of principal components based on PCs variance plot. Let’s call the number of PCs n_pc. Then we can use the best PCs instead of the data to perform cluster analysis. To do this, run:
+
+```{r}
+data <- nc_data[complete.cases(nc_data),]
+mydata  <- select(data, c(beds, rbeds, `out-v`, adm, sir, salesy, sales12, hip, knee, hip12, knee12, femur12 ))
+pca <- prcomp(mydata, center = TRUE, scale. = TRUE)
+
+plot(pca, type = "l")
+```
+
+```{r}
+summary(pca)
+
+```
+
+```{r}
+n_pc <-4
+pca_data <- predict(pca, newdata = nc_data)
+pc_df <- as.data.frame(scale(pca_data[,c(1:n_pc)]))  # replace n_pc with the number of PCs you recommend. 
+#pc_df
+```
+
+
+8.1.	(10 points) Repeat your analysis in question 5 using the new pc_df. What is the best k? Paste the two-dimensional representation in the space below: 
+
+```{r}
+withinssplot <- function(pc_df, nc=15, seed=1234){
+  wss <- (nrow(pc_df)-1)*sum(apply(pc_df,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(pc_df, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of Clusters",
+       ylab="Within groups sum of squares")}
+withinssplot(pc_df, nc=10) 
+```
+
+```{r}
+k.means.fit <- kmeans(pc_df, 4)
+# To create the clusters in 2-dimensional space:
+library(cluster)
+clusplot(pc_df, k.means.fit$cluster, main='2D representation of the Cluster solution', color=TRUE, shade=TRUE, labels=2, lines=0)
+```
+
+
+8.2.	(10 points) Repeat your analysis in question 6 using the new pc_df. What is the best method? What is the best k? Paste the dendrogram in the space below:
+
+
+```{r}
+#df
+d <- dist(pc_df, method = "euclidean") # Euclidean distance matrix.
+H.single <- hclust(d, method="single")
+H.average <- hclust(d, method="average")
+H.complete <- hclust(d, method="complete")
+H.ward <- hclust(d, method="ward.D2")
+
+
+par(mfrow=c(2,2))
+plot(H.single)
+plot(H.complete)
+plot(H.average)
+plot(H.ward)
+
+```
+
+```{r}
+par(mfrow=c(1,1))
+groups <- cutree(H.ward, k=4) # cut tree into 3 clusters
+
+plot(H.ward)
+rect.hclust(H.ward, k=4, border="red")
+```
+
+8.3.	(10 points) Repeat your analysis in question 7 using the new pc_df. What is the best minPts? What is the best eps? How many clusters DBSCAN returns? Perform the DBSCAN clustering and paste the two-dimensional representation in the space below: 
+
+```{r}
+kNNdistplot(pc_df, k =5)
+abline(h=2.2, col="red")
+```
+
+```{r}
+db <- dbscan(pc_df, eps=2.2, minPts=5)
+db
+```
+
+```{r}
+clusplot(pc_df, db$cluster, main='2D representation of the Cluster solution',
+         color=TRUE, shade=TRUE,
+         labels=2, lines=0)
+
+```
+
+```{r}
+hullplot(pc_df, db)
+```
+
+
+9.	For each hospital, determine the cluster (based on pc_df) to which they belong. Then determine the value of "sales12","rbeds","hip12","knee12", and "femur12" for each cluster for each clustering method (e.g. k-means, hierarchical, DBSCAN). To do this, you need to run the following lines:
+
+
+```{r}
+pc_df$kmeans <- k.means.fit$cluster
+pc_df $hclust <- groups # these groups are created in hierarchical clustering
+pc_df $db <- db$cluster
+pc_df $hid <- nc_data$hid # Add hospital id to pc_df data
+final_data <- merge(x=pc_df, y=nc_data, key="hid")
+aggregate(final_data[,c("sales12","rbeds","hip12","knee12","femur12")], list(final_data$kmeans), mean)
+aggregate(final_data[,c("sales12","rbeds","hip12","knee12","femur12")], list(final_data$hclust), mean)
+aggregate(final_data[,c("sales12","rbeds","hip12","knee12","femur12")], list(final_data$db), mean)
+```
+```{r}
+plot(silhouette(k.means.fit$cluster, d)) # d is the distance
+```
+
+```{r}
+sk <- silhouette(k.means.fit$cluster, d) # d is the distance
+
+pdf('my_nice_plot1.pdf')
+plot(sk)
+```
+
+```{r}
+sk <- silhouette(groups, d) # d is the distance
+
+pdf('my_nice_plot.pdf')
+plot(sk)
+```
+
+
+```{r}
+sk <- silhouette(db$cluster, d) # d is the distance
+
+pdf('my_nice_plot3.pdf')
+plot(sk)
+```
+
+
+
+
+
+9.1.	(20 points) Based on these results for each clustering method (e.g. k-means, hierartchical, and DBSCAN), recommend which cluster we should immediately reach out to. Give your reasons.
+
+
+Ans. I would recommend HIerarchical clustering method for this dataset. As it shows four clear segmentations and indicates higher the number of hip, knee and femur operations, higher the sales of that hospital.
+
+
+
+
+
+
+
+
+
